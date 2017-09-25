@@ -7,50 +7,55 @@ import myToken
 
 URL = 'https://api.telegram.org/bot' + myToken.__get__() + '/'
 updateId = 0
-helpMesDict = {'/btc': 'Курс Биткойна к Доллару США',
-               '/eth': 'Курс Эфириума к Доллару США',
-               '/aud': 'Курс Австралийского доллара',
-               '/azn': 'Курс Азербайджанского маната',
-               '/amd': 'Курс Армянских драмов',
-               '/byn': 'Курс Белорусского рубля',
-               '/bgn': 'Курс Болгарского льва',
-               '/brl': 'Курс Бразильского реала',
-               '/huf': 'Курс Венгерских форинтов',
-               '/krw': 'Курс Вон Республики Корея',
-               '/hkd': 'Курс Гонконгских долларов',
-               '/dkk': 'Курс Датских крон',
-               '/usd': 'Курс Доллара США',
-               '/eur': 'Курс Евро',
-               '/inr': 'Курс Индийских рупий',
-               '/kzt': 'Курс Казахстанских тенге',
-               '/cad': 'Курс Канадского доллара',
-               '/kgs': 'Курс Киргизских сомов',
-               '/cny': 'Курс Китайских юаней',
-               '/mdl': 'Курс Молдавских леев',
-               '/tmt': 'Курс Нового туркменского маната',
-               '/nok': 'Курс Норвежских крон',
-               '/pln': 'Курс Польских злотых',
-               '/ron': 'Курс Румынского лея',
-               '/xdr': 'Курс СДР (специальных прав заимствования)',
-               '/sgd': 'Курс Сингапурского доллара',
-               '/tjs': 'Курс Таджикских сомони',
-               '/try': 'Курс Турецких лир',
-               '/uzs': 'Курс Узбекских сумов',
-               '/uah': 'Курс Украинских гривен',
-               '/gbp': 'Курс Фунт стерлингов',
-               '/czk': 'Курс Чешских крон',
-               '/sek': 'Курс Шведских крон',
-               '/chf': 'Курс Швейцарских франков',
-               '/zar': 'Курс Южноафриканских рэндов',
-               '/jpy': 'Курс Японских иен'}
-helpMes = '\n'.join([key + ' - к' + helpMesDict[key][1:] for key in helpMesDict])
+helpCryptoDict = {'/btc': 'Курс Биткойна к Доллару США',
+                  '/eth': 'Курс Эфириума к Доллару США', }
+helpCurrencyDict = {'/btc': 'Курс Биткойна к Доллару США',
+                    '/eth': 'Курс Эфириума к Доллару США',
+                    '/aud': 'Курс Австралийского доллара',
+                    '/azn': 'Курс Азербайджанского маната',
+                    '/amd': 'Курс Армянских драмов',
+                    '/byn': 'Курс Белорусского рубля',
+                    '/bgn': 'Курс Болгарского льва',
+                    '/brl': 'Курс Бразильского реала',
+                    '/huf': 'Курс Венгерских форинтов',
+                    '/krw': 'Курс Вон Республики Корея',
+                    '/hkd': 'Курс Гонконгских долларов',
+                    '/dkk': 'Курс Датских крон',
+                    '/usd': 'Курс Доллара США',
+                    '/eur': 'Курс Евро',
+                    '/inr': 'Курс Индийских рупий',
+                    '/kzt': 'Курс Казахстанских тенге',
+                    '/cad': 'Курс Канадского доллара',
+                    '/kgs': 'Курс Киргизских сомов',
+                    '/cny': 'Курс Китайских юаней',
+                    '/mdl': 'Курс Молдавских леев',
+                    '/tmt': 'Курс Нового туркменского маната',
+                    '/nok': 'Курс Норвежских крон',
+                    '/pln': 'Курс Польских злотых',
+                    '/ron': 'Курс Румынского лея',
+                    '/xdr': 'Курс СДР (специальных прав заимствования)',
+                    '/sgd': 'Курс Сингапурского доллара',
+                    '/tjs': 'Курс Таджикских сомони',
+                    '/try': 'Курс Турецких лир',
+                    '/uzs': 'Курс Узбекских сумов',
+                    '/uah': 'Курс Украинских гривен',
+                    '/gbp': 'Курс Фунт стерлингов',
+                    '/czk': 'Курс Чешских крон',
+                    '/sek': 'Курс Шведских крон',
+                    '/chf': 'Курс Швейцарских франков',
+                    '/zar': 'Курс Южноафриканских рэндов',
+                    '/jpy': 'Курс Японских иен'}
+helpMes = '*Криптовалюты:*\n'
+helpMes += '\n'.join([key + ' - к' + helpCryptoDict[key][1:] for key in sorted(helpCryptoDict)])
+helpMes += '\n*Курсы ЦБ:*\n'
+helpMes += '\n'.join([key + ' - к' + helpCurrencyDict[key][1:] for key in sorted(helpCurrencyDict)])
 startMes = 'Здравствуйте! Я позволяю смотреть официальные курсы Центробанка для всех валют к Российскому рублю, а также курсы двух популярнейших криптовалют прямиком из биржи. Для получения полного списка команд воспользуйтесь командой /help'
 
 
 def getUpdates():
-    url = URL + 'getUpdates'
+    url = URL + 'getUpdates?timeout=10'
     if updateId > 0:
-        url += '?offset=' + str(updateId)
+        url += '&offset=' + str(updateId)
     try:
         response = requests.get(url)
     except:
@@ -64,10 +69,10 @@ def getNewMessages():
     if data:
         if not data['ok'] == True:
             return None
-        elif len(data['result']) == 1:
+        elif not len(data['result']):
             return None
         else:
-            data = data['result'][1:]
+            data = data['result']
             for mes in data:
                 if 'edited_message' in mes:
                     mes['message'] = mes['edited_message']
@@ -96,7 +101,7 @@ def sendMessage(chatId, mesText, replyId = -1, parseMode = 'Markdown'):
 
 def responseCrypto(mes):
     mesText = mes['mesText']
-    respMes = '`' + helpMesDict[mesText] + '`\n('
+    respMes = '`' + helpCryptoDict[mesText] + '`\n('
     mesText = mesText[1:]
     rates = yobit.cry_usd(mesText)
     if rates:
@@ -106,8 +111,8 @@ def responseCrypto(mes):
 
 def responseCurrency(mes):
     mesText = mes['mesText']
-    if mesText in helpMesDict:
-        respMes = '`' + helpMesDict[mesText] + ' к Российскому рублю`\n('
+    if mesText in helpCurrencyDict:
+        respMes = '`' + helpCurrencyDict[mesText] + ' к Российскому рублю`\n('
         mesText = mesText[1:].upper()
         rate = centralBank.getRate(mesText)
         if rate:
@@ -120,6 +125,7 @@ def responseCurrency(mes):
 if __name__ == '__main__':
     while True:
         mesList = getNewMessages()
+        print(mesList)
         if mesList:
             for mes in mesList:
                 mesText = mes['mesText']
@@ -136,10 +142,8 @@ if __name__ == '__main__':
                     elif mesText == '/help':
                         sendMessage(mes['chatId'], helpMes, (mes['mesId'] if mes['chatType'] == 'group' else -1))
                     elif mesText == '/btc' or mesText == '/eth':
-                        t = threading.Thread(target=responseCrypto, args=(mes,))
-                        t.start()
+                        threading.Thread(target=responseCrypto, args=(mes,)).start()
                     else:
-                        t = threading.Thread(target=responseCurrency, args=(mes,))
-                        t.start()
-            updateId = mesList[-1]['updateId']
+                        threading.Thread(target=responseCurrency, args=(mes,)).start()
+            updateId = mesList[-1]['updateId'] + 1
 
