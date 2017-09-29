@@ -58,10 +58,11 @@ def getUpdates():
         url += '&offset=' + str(updateId)
     try:
         response = requests.get(url)
+        response = response.json()
     except:
         return None
     else:
-        return response.json()
+        return response
 
 
 def getNewMessages():
@@ -73,12 +74,15 @@ def getNewMessages():
             return None
         else:
             data = data['result']
+            global updateId
+            updateId = data[-1]['update_id'] + 1
             for mes in data:
                 if 'edited_message' in mes:
                     mes['message'] = mes['edited_message']
                     del mes['edited_message']
-            mesList = [{'updateId': mes['update_id'],
-                        'chatId': mes['message']['chat']['id'],
+                if mes['message']['chat']['type'] == 'supergroup':
+                    mes['message']['chat']['type'] = 'group'
+            mesList = [{'chatId': mes['message']['chat']['id'],
                         'chatType': mes['message']['chat']['type'],
                         'mesId': mes['message']['message_id'],
                         'mesText': mes['message']['text']}
@@ -145,5 +149,4 @@ if __name__ == '__main__':
                         threading.Thread(target=responseCrypto, args=(mes,)).start()
                     else:
                         threading.Thread(target=responseCurrency, args=(mes,)).start()
-            updateId = mesList[-1]['updateId'] + 1
 
