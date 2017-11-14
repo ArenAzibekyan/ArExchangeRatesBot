@@ -1,152 +1,211 @@
 import requests
-import threading
-import yobit
-import centralBank
+from time import sleep
+from centralBankParser import CentralBankParser
 import myToken
 
 
-URL = 'https://api.telegram.org/bot' + myToken.__get__() + '/'
+URL = 'https://api.telegram.org/bot' + myToken.get() + '/'
 updateId = 0
-helpCryptoDict = {'/btc': 'Курс Биткойна к Доллару США',
-                  '/eth': 'Курс Эфириума к Доллару США', }
-helpCurrencyDict = {'/btc': 'Курс Биткойна к Доллару США',
-                    '/eth': 'Курс Эфириума к Доллару США',
-                    '/aud': 'Курс Австралийского доллара',
-                    '/azn': 'Курс Азербайджанского маната',
-                    '/amd': 'Курс Армянских драмов',
-                    '/byn': 'Курс Белорусского рубля',
-                    '/bgn': 'Курс Болгарского льва',
-                    '/brl': 'Курс Бразильского реала',
-                    '/huf': 'Курс Венгерских форинтов',
-                    '/krw': 'Курс Вон Республики Корея',
-                    '/hkd': 'Курс Гонконгских долларов',
-                    '/dkk': 'Курс Датских крон',
-                    '/usd': 'Курс Доллара США',
-                    '/eur': 'Курс Евро',
-                    '/inr': 'Курс Индийских рупий',
-                    '/kzt': 'Курс Казахстанских тенге',
-                    '/cad': 'Курс Канадского доллара',
-                    '/kgs': 'Курс Киргизских сомов',
-                    '/cny': 'Курс Китайских юаней',
-                    '/mdl': 'Курс Молдавских леев',
-                    '/tmt': 'Курс Нового туркменского маната',
-                    '/nok': 'Курс Норвежских крон',
-                    '/pln': 'Курс Польских злотых',
-                    '/ron': 'Курс Румынского лея',
-                    '/xdr': 'Курс СДР (специальных прав заимствования)',
-                    '/sgd': 'Курс Сингапурского доллара',
-                    '/tjs': 'Курс Таджикских сомони',
-                    '/try': 'Курс Турецких лир',
-                    '/uzs': 'Курс Узбекских сумов',
-                    '/uah': 'Курс Украинских гривен',
-                    '/gbp': 'Курс Фунт стерлингов',
-                    '/czk': 'Курс Чешских крон',
-                    '/sek': 'Курс Шведских крон',
-                    '/chf': 'Курс Швейцарских франков',
-                    '/zar': 'Курс Южноафриканских рэндов',
-                    '/jpy': 'Курс Японских иен'}
-helpMes = '*Криптовалюты:*\n'
-helpMes += '\n'.join([key + ' - к' + helpCryptoDict[key][1:] for key in sorted(helpCryptoDict)])
-helpMes += '\n*Курсы ЦБ:*\n'
-helpMes += '\n'.join([key + ' - к' + helpCurrencyDict[key][1:] for key in sorted(helpCurrencyDict)])
-startMes = 'Здравствуйте! Я позволяю смотреть официальные курсы Центробанка для всех валют к Российскому рублю, а также курсы двух популярнейших криптовалют прямиком из биржи. Для получения полного списка команд воспользуйтесь командой /help'
 
 
+#
+# получение обновлений
 def getUpdates():
+    # урла
     url = URL + 'getUpdates?timeout=10'
+    # только новые апдейты
     if updateId > 0:
         url += '&offset=' + str(updateId)
+    # get-запрос
     try:
-        response = requests.get(url)
-        response = response.json()
+        response = requests.get(url).json()
+    # не удался
     except:
+        print('Exception in getUpdates method')
+        sleep(10)
         return None
+    # удался
     else:
         return response
 
 
-def getNewMessages():
-    data = getUpdates()
-    if data:
-        if not data['ok'] == True:
+#
+# получение новых сообщений
+def getNecessaryUpd():
+    updates = getUpdates()
+    # запрос удался
+    if updates:
+        # все ок
+        if not updates['ok']:
             return None
-        elif not len(data['result']):
+        updates = updates['result']
+        # есть ли апдейты
+        if not len(updates):
             return None
-        else:
-            data = data['result']
-            global updateId
-            updateId = data[-1]['update_id'] + 1
-            for mes in data:
-                if 'edited_message' in mes:
-                    mes['message'] = mes['edited_message']
-                    del mes['edited_message']
-                if mes['message']['chat']['type'] == 'supergroup':
-                    mes['message']['chat']['type'] = 'group'
-            mesList = [{'chatId': mes['message']['chat']['id'],
-                        'chatType': mes['message']['chat']['type'],
-                        'mesId': mes['message']['message_id'],
-                        'mesText': mes['message']['text']}
-                       for mes in data if 'message' in mes if 'text' in mes['message']]
-            return mesList
-    else:
-        return None
+        # сохранение айди апдейта
+        global updateId
+        updateId = updates[-1]['update_id'] + 1
+        # избавление от редактированных сообщений
+        for upd in updates:
+            if 'edited_message' in upd:
+                upd['message'] = upd['edited_message']
+        # только текстовые сообщения и нажатия кнопок
+        necessary = [upd for upd in updates if ('message' in upd and 'text' in upd['message']) or 'callback_query' in upd]
+        return necessary
 
 
-def sendMessage(chatId, mesText, replyId = -1, parseMode = 'Markdown'):
+#
+# отправка сообщения
+def sendMessage(chatId, mesText, replyMarkup=None, parseMode='Markdown'):
     url = URL + 'sendMessage?chat_id={0}&text={1}&parse_mode={2}'.format(chatId, mesText, parseMode)
-    if not replyId == -1: url += '&reply_to_message_id={}'.format(replyId)
+    # get-запрос
     try:
-        response = requests.get(url)
+        if replyMarkup:
+            response = requests.get(url, data=replyMarkup)
+        else:
+            response = requests.get(url)
+        response = response.json()
+    # не удался
     except:
+        print('Exception in sendMessage method')
         return None
+    # удался
     else:
-        return response.json()
+        return response
 
 
-def responseCrypto(mes):
-    mesText = mes['mesText']
-    respMes = '`' + helpCryptoDict[mesText] + '`\n('
-    mesText = mesText[1:]
-    rates = yobit.cry_usd(mesText)
-    if rates:
-        respMes += mesText.upper() + ' -> USD)\n*Avg:* _{2:.2f}_\n*Min:* _{0:.2f}_\n*Max:* _{1:.2f}_'.format(*rates)
-        sendMessage(mes['chatId'], respMes, (mes['mesId'] if mes['chatType'] == 'group' else -1))
+#
+# отправка фотки
+def sendPhoto(chatId, image):
+    # урла
+    url = URL + 'sendPhoto'
+    # данные запроса
+    data = {'chat_id': chatId}
+    file = {'photo': image}
+    # get-запрос
+    try:
+        response = requests.post(url, files=file, data=data).json()
+    # не удался
+    except:
+        print('Exception in sendPhoto method')
+        return None
+    # удался
+    else:
+        return response
 
 
-def responseCurrency(mes):
-    mesText = mes['mesText']
-    if mesText in helpCurrencyDict:
-        respMes = '`' + helpCurrencyDict[mesText] + ' к Российскому рублю`\n('
-        mesText = mesText[1:].upper()
-        rate = centralBank.getRate(mesText)
-        if rate:
-            if not rate['count'] == '1':
-                respMes += rate['count'] + ' '
-            respMes += mesText + ' -> RUB)\n*ЦБ:* _{0:.2f}_'.format(rate['price'])
-            sendMessage(mes['chatId'], respMes, (mes['mesId'] if mes['chatType'] == 'group' else -1))
+#
+# редактирование сообщения
+def editMessage(chatId, mesId, mesText, replyMarkup=None, parseMode='Markdown'):
+    url = URL + 'editMessageText?chat_id={0}&message_id={1}&text={2}&parse_mode={3}'.format(chatId, mesId, mesText, parseMode)
+    # get-запрос
+    try:
+        if replyMarkup:
+            response = requests.get(url, data=replyMarkup)
+        else:
+            response = requests.get(url)
+        response = response.json()
+    # не удался
+    except:
+        print('Exception in editMessage method')
+        return None
+    # удался
+    else:
+        return response
 
 
+#
+# я дарю ему жизнь
 if __name__ == '__main__':
+    cb = CentralBankParser()
+    helpList = CentralBankParser.getHelpList()
     while True:
-        mesList = getNewMessages()
-        print(mesList)
-        if mesList:
-            for mes in mesList:
-                mesText = mes['mesText']
-                if '@' in mesText:
-                    spl = mesText.split('@')
-                    if not spl[1] == 'ArExchangeRatesBot':
-                        continue
-                    else:
-                        mes['mesText'] = mesText = spl[0]
-                if mesText[0] == '/':
-                    if mesText == '/start':
-                        sendMessage(mes['chatId'], startMes)
-                        sendMessage(mes['chatId'], '*Приятного пользования!*')
-                    elif mesText == '/help':
-                        sendMessage(mes['chatId'], helpMes, (mes['mesId'] if mes['chatType'] == 'group' else -1))
-                    elif mesText == '/btc' or mesText == '/eth':
-                        threading.Thread(target=responseCrypto, args=(mes,)).start()
-                    else:
-                        threading.Thread(target=responseCurrency, args=(mes,)).start()
-
+        necessary = getNecessaryUpd()
+        if necessary:
+            for upd in necessary:
+                #
+                # нажатие кнопки
+                if 'callback_query' in upd:
+                    query = upd['callback_query']
+                    mes = query['message']
+                    helpMes = helpList[int(query['data'])]
+                    editMessage(mes['chat']['id'], mes['message_id'], helpMes['text'], helpMes['markup'])
+                #
+                # текстовое сообщение
+                else:
+                    mes = upd['message']
+                    mesObj = cb.parseMesText(mes['text'])
+                    # если запарсилось, значит свежая таблица валют
+                    if mesObj:
+                        #
+                        # вывод инструкции
+                        if not mesObj['ok']:
+                            helpMes = helpList[mesObj['page']]
+                            sentMes = sendMessage(mes['chat']['id'], helpMes['text'], helpMes['markup'])
+                            if sentMes and not sentMes['ok']:
+                                print(sentMes)
+                        else:
+                            type = mesObj['type']
+                            #
+                            # вывод курса
+                            if type == 'cost':
+                                currency = cb.currencyTable[mesObj['cur']]
+                                respMes = 'Цена на _{0} {1}_: *{2:.2f}*'
+                                respMes = respMes.format(currency['nominal'], currency['name'], currency['value'])
+                                sentMes = sendMessage(mes['chat']['id'], respMes)
+                                if sentMes and not sentMes['ok']:
+                                    print(sentMes)
+                            #
+                            # конвертер
+                            elif type == 'convert':
+                                # в рубли
+                                if mesObj['to'] == 'RUB':
+                                    currency = cb.currencyTable[mesObj['from']]
+                                    value = (currency['value'] / currency['nominal']) * mesObj['amount']
+                                # из рублей
+                                elif mesObj['from'] == 'RUB':
+                                    currency = cb.currencyTable[mesObj['to']]
+                                    value = (currency['nominal'] / currency['value']) * mesObj['amount']
+                                # кастомная конвертация
+                                else:
+                                    fromCur = cb.currencyTable[mesObj['from']]
+                                    toCur = cb.currencyTable[mesObj['to']]
+                                    value = ((fromCur['value'] / fromCur['nominal']) /
+                                             (toCur['value'] / toCur['nominal'])) * mesObj['amount']
+                                # оформление и отправка
+                                respMes = 'Конвертер валют\n_{0} {1} -> {2}_: *{3:.2f}*'
+                                respMes = respMes.format(mesObj['amount'], mesObj['from'], mesObj['to'], value)
+                                sentMes = sendMessage(mes['chat']['id'], respMes)
+                                if sentMes and not sentMes['ok']:
+                                    print(sentMes)
+                            #
+                            # построение графика
+                            elif type == 'graph':
+                                image = cb.getImage(mesObj['cur'], mesObj['fromDate'])
+                                if image:
+                                    sentMes = sendPhoto(mes['chat']['id'], image)
+                                else:
+                                    respMes = '*Произошла ошибка* при построении _динамики котировок_'
+                                    sentMes = sendMessage(mes['chat']['id'], respMes)
+                                if sentMes and not sentMes['ok']:
+                                    print(sentMes)
+                            #
+                            # вывод всех валют
+                            elif type == 'all':
+                                respMes = cb.getAllMes()
+                                sentMes = sendMessage(mes['chat']['id'], respMes)
+                                if sentMes and not sentMes['ok']:
+                                    print(sentMes)
+                            #
+                            # первый запуск бота
+                            elif type == 'start':
+                                respMes = '*Здравствуйте!*\nЯ умею:'
+                                sentMes = sendMessage(mes['chat']['id'], respMes)
+                                if sentMes:
+                                    if sentMes['ok']:
+                                        helpMes = helpList[0]
+                                        sentMes = sendMessage(mes['chat']['id'], helpMes['text'], helpMes['markup'])
+                                        if sentMes and not sentMes['ok']:
+                                            print(sentMes)
+                                    else:
+                                        print(sentMes)
