@@ -197,6 +197,7 @@ class CentralBankParser:
             # бинарный поток ввода-вывода в RAM
             buf = io.BytesIO()
             fig.savefig(buf, format='png')
+            plt.close(fig)
             # чтение в битовый массив
             image = buf.getvalue()
             buf.close()
